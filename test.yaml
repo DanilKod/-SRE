@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: Заменить тут
+  labels:
+    app: Заменить тут
+spec:
+  replicas: 1 
+  selector:
+    matchLabels:
+      app: Заменить тут
+  strategy:
+    type: RollingUpdate  # Гарантирует плавные деплои
+  # хороший способ но на проде использовал бы canary , но надо немного по другому напистаь весь файл 
+  template:
+    metadata:
+      labels:
+        app: Заменить тут
+    spec:
+      topologySpreadConstraints: # есть еще способ region и zone
+      # На практике не применял , по этому увереным что будет рабоать сразу правильно
+      # надо тестить 
+      # Распределим по нодам (нагрузка равномернее будет)
+        - maxSkew: 1
+          topologyKey: "kubernetes.io/hostname"
+          whenUnsatisfiable: "ScheduleAnyway"
+          labelSelector:
+            matchLabels:
+              app: Заменить тут
+      containers:
+        - name: Заменить тут
+          image: yourrepo/Заменить тут:latest
+          ports:
+            - containerPort: 80
+          resources:
+          # чуть чуть больше "ровной" запас не большой должен быть 
+            requests:
+              cpu: "200m" 
+              memory: "140Mi"
+          # для первого прогруза 
+          # про память не было речи, но так как ресурсов для запуска нужно больше лучше увеличить 
+            limits:
+              cpu: "1"   
+              memory: "200Mi"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 80
+            # так как идет первичный запуск который требует больше ресурсов
+            # подождем пока запуститься чтоб менять поды 
+            initialDelaySeconds: 7 
+            periodSeconds: 5
+            failureThreshold: 3 # чтоб вечно в перезапуске не был 
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3 # чтоб вечно в перезапуске не был 
+            timeoutSeconds: 3
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: Заменить тут
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: Заменить тут
+  minReplicas: 1           # на ночью
+  maxReplicas: 5           # 5 для отказа устойчивости 
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization # процент от использования 
+          averageUtilization: 70  # на каком значении идет тригер 
